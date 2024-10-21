@@ -3992,6 +3992,13 @@ int SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
         return SDL_SetError("Unknown OpenGL attribute");
     }
 
+    glGetErrorFunc = SDL_GL_GetProcAddress("glGetError");
+    if (!glGetErrorFunc) {
+        return -1;
+    }
+
+    SDL_bool query_component = SDL_TRUE;
+
 #ifdef SDL_VIDEO_OPENGL
     glGetStringFunc = SDL_GL_GetProcAddress("glGetString");
     if (!glGetStringFunc) {
@@ -3999,6 +4006,7 @@ int SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
     }
 
     if (attachmentattrib && isAtLeastGL3((const char *)glGetStringFunc(GL_VERSION))) {
+        query_component = SDL_FALSE;
         /* glGetFramebufferAttachmentParameteriv needs to operate on the window framebuffer for this, so bind FBO 0 if necessary. */
         GLint current_fbo = 0;
         void(APIENTRY * glGetIntegervFunc)(GLenum pname, GLint * params) = SDL_GL_GetProcAddress("glGetIntegerv");
@@ -4013,14 +4021,17 @@ int SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
                 glBindFramebufferFunc(GL_DRAW_FRAMEBUFFER, 0);
             }
             glGetFramebufferAttachmentParameterivFunc(GL_FRAMEBUFFER, attachment, attachmentattrib, (GLint *)value);
+            query_component = (glGetErrorFunc() != GL_NO_ERROR) ? SDL_TRUE : SDL_FALSE;
             if (glBindFramebufferFunc && (current_fbo != 0)) {
                 glBindFramebufferFunc(GL_DRAW_FRAMEBUFFER, current_fbo);
             }
         } else {
             return -1;
         }
-    } else
+    }
 #endif
+
+    if (query_component)
     {
         void(APIENTRY * glGetIntegervFunc)(GLenum pname, GLint * params);
         glGetIntegervFunc = SDL_GL_GetProcAddress("glGetIntegerv");
@@ -4029,11 +4040,6 @@ int SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
         } else {
             return -1;
         }
-    }
-
-    glGetErrorFunc = SDL_GL_GetProcAddress("glGetError");
-    if (!glGetErrorFunc) {
-        return -1;
     }
 
     error = glGetErrorFunc();
